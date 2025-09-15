@@ -231,11 +231,12 @@ if __name__ == "__main__":
     else:
         models = args.model_list
 
+    sorted_model_list = sorted(models)
     if args.mode == "single":
         judges = make_judge_single(args.judge_model, judge_prompts)
         play_a_match_func = play_a_match_single
         output_file = (
-            f"data/{args.bench_name}/model_judgment/{args.judge_model}_single.jsonl"
+            f"data/{args.bench_name}/model_judgment/{args.judge_model}_{'_vs_'.join(sorted_model_list)}_single.jsonl"
         )
         make_match_func = make_match_single
         baseline_model = None
@@ -243,7 +244,7 @@ if __name__ == "__main__":
         judges = make_judge_pairwise(args.judge_model, judge_prompts)
         play_a_match_func = play_a_match_pair
         output_file = (
-            f"data/{args.bench_name}/model_judgment/{args.judge_model}_pair.jsonl"
+            f"data/{args.bench_name}/model_judgment/{args.judge_model}_{'_vs_'.join(sorted_model_list)}_pair.jsonl"
         )
         if args.mode == "pairwise-all":
             make_match_func = make_match_all_pairs
@@ -251,7 +252,7 @@ if __name__ == "__main__":
         else:
             make_match_func = make_match
             baseline_model = args.baseline_model
-
+            
     check_data(questions, model_answers, ref_answers, models, judges)
 
     question_math = [q for q in questions if q["category"] in NEED_REF_CATS]
@@ -301,7 +302,7 @@ if __name__ == "__main__":
     # Show match stats and prompt enter to continue
     print("Stats:")
     print(json.dumps(match_stat, indent=4))
-    input("Press Enter to confirm...")
+    # input("Press Enter to confirm...")
 
     # Play matches
     if args.parallel == 1:

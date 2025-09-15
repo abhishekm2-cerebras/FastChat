@@ -34,3 +34,8 @@ build
 serve_images
 val2014
 vqa_examples
+
+# Ignore answers 
+fastchat/llm_judge/data/vicuna_ar_extended/answer_excel
+fastchat/llm_judge/data/vicuna_ar_extended/model_answer
+fastchat/llm_judge/data/vicuna_ar_extended/model_judgment 
