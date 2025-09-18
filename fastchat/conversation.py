@@ -39,6 +39,7 @@ class SeparatorStyle(IntEnum):
     GEMMA = auto()
     CLLM = auto()
     DEFAULT = auto()
+    HALA = auto()
 
 
 IMAGE_PLACEHOLDER_STR = "$$<image>$$"
@@ -323,6 +324,14 @@ class Conversation:
                     ret += role + ": " + message + "\n"
                 else:
                     ret += role + ":"
+            return ret
+        elif self.sep_style == SeparatorStyle.HALA:
+            ret = "<bos>"
+            for role, message in self.messages:
+                if message:
+                    ret += "<start_of_turn>" + role + "\n" + message + "<end_of_turn>" + self.sep
+                else:
+                    ret += "<start_of_turn>" + role + "\n"
             return ret
         else:
             raise ValueError(f"Invalid style: {self.sep_style}")
@@ -2312,6 +2321,17 @@ register_conv_template(
     )
 )
 
+#Hala Conversation Template 
+register_conv_template(
+    Conversation(
+        name="hala",
+        system_message="",
+        roles=("user", "model"),
+        sep_style=SeparatorStyle.HALA,
+        stop_token_ids=[1],
+        sep='\n',
+    )
+)
 
 register_conv_template(
     Conversation(

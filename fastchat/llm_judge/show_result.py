@@ -14,7 +14,7 @@ def display_result_single(args):
     if args.input_file is None:
         input_file = (
             # f"data/{args.bench_name}/model_judgment/{args.judge_model}_single.jsonl"
-            f"data/{args.bench_name}/model_judgment/{args.judge_model}_{'_vs_'.join(sorted_model_list)}_single.jsonl"
+            f"data/{args.bench_name}/model_judgment/{args.judge_model}_single.jsonl"
         )
     else:
         input_file = args.input_file
