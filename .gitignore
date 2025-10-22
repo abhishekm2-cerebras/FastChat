@@ -39,3 +39,8 @@ vqa_examples
 fastchat/llm_judge/data/vicuna_ar_extended/answer_excel
 fastchat/llm_judge/data/vicuna_ar_extended/model_answer
 fastchat/llm_judge/data/vicuna_ar_extended/model_judgment 
+fastchat/llm_judge/submit_slurm.sh
+
+*.jsonl
+
+fastchat/llm_judge/data/vicuna_x_logic/
