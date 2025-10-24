@@ -170,7 +170,7 @@ def run_judge_single(question, answer, judge, ref_answer, multi_turn=False):
             model, conv, temperature=0, max_tokens=1024
         )
     else:
-        raise ValueError(f"Invalid judge model name: {model}")
+        raise ValueError(f"Invalid judge model name: {model}\n OPENAI_MODEL_LIST: {OPENAI_MODEL_LIST}")
 
     if judge.prompt_template["output_format"] == "[[rating]]":
         match = re.search(one_score_pattern, judgment)

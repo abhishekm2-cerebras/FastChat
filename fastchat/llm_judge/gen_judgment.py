@@ -183,6 +183,15 @@ if __name__ == "__main__":
     parser.add_argument("--judge-model", type=str, default="gpt-4")
     parser.add_argument("--baseline-model", type=str, default="gpt-3.5-turbo")
     parser.add_argument(
+            "--ref-judge-model",
+            type=str,
+            default=None,
+            help=(
+                "Model name whose reference answers to use for math/reasoning/coding/etc. "
+                "Defaults to the judge model; falls back to 'gpt-4' if unavailable."
+            ),
+        )
+    parser.add_argument(
         "--mode",
         type=str,
         default="single",
@@ -220,6 +229,29 @@ if __name__ == "__main__":
     model_answers = load_model_answers(answer_dir)
     ref_answers = load_model_answers(ref_answer_dir)
 
+    # Decide which model supplies reference answers
+    ref_source = args.ref_judge_model or args.judge_model
+    if ref_source not in ref_answers:
+        if "gpt-4" in ref_answers:
+            print(
+                f"[INFO] Reference answers for '{ref_source}' not found. "
+                "Falling back to 'gpt-4'."
+            )
+            ref_source = "gpt-4"
+        else:
+            print(
+                "[WARNING] No suitable reference answer provider found. "
+                "Ref-based categories will be skipped."
+            )
+            # Empty dict avoids KeyError; math/reasoning categories will fail check_data
+            # unless we later guard them. So we disable ref-based judges below.
+            ref_source = None
+
+    # If we have a valid source different from the judge model, alias it
+    if ref_source and args.judge_model not in ref_answers:
+        ref_answers[args.judge_model] = ref_answers[ref_source]
+
+
     # Load judge
     judge_prompts = load_judge_prompts(args.judge_file)
 
@@ -234,6 +266,11 @@ if __name__ == "__main__":
     sorted_model_list = sorted(models)
     if args.mode == "single":
         judges = make_judge_single(args.judge_model, judge_prompts)
+        # If no reference answers, disable ref_based flags
+        if ref_source is None:
+            judges["math"].ref_based = False
+            judges["math-mt"].ref_based = False
+        play_a_match_func = play_a_match_single
         play_a_match_func = play_a_match_single
         output_file = (
             f"data/{args.bench_name}/model_judgment/{args.judge_model}_single.jsonl"
@@ -242,6 +279,9 @@ if __name__ == "__main__":
         baseline_model = None
     else:
         judges = make_judge_pairwise(args.judge_model, judge_prompts)
+        if ref_source is None:
+            judges["math"].ref_based = False
+            judges["math-mt"].ref_based = False
         play_a_match_func = play_a_match_pair
         output_file = (
             f"data/{args.bench_name}/model_judgment/{args.judge_model}_{'_vs_'.join(sorted_model_list)}_pair.jsonl"
