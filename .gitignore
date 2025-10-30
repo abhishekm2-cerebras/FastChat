@@ -44,3 +44,5 @@ fastchat/llm_judge/submit_slurm.sh
 *.jsonl
 
 fastchat/llm_judge/data/vicuna_x_logic/
+
+*env*
