@@ -50,6 +50,9 @@ for bench_name in "${bench_names[@]}"; do
         python gen_model_answer.py --model-path "$model2_path" --model-id "$model2_id" --bench-name $bench_name --num-gpus-per-model 2 --num-gpus-total 2 --vllm
     fi
 
+if [ ! -f "/home/abhishek.maiti/projects/abhishekm2-cerebras/FastChat/fastchat/llm_judge/data/$bench_name/model_answer/$model2_id.jsonl" ]; then    
+    python gen_model_answer.py --model-path "$model2_path" --model-id "$model2_id" --bench-name $bench_name --num-gpus-per-model 1 --num-gpus-total 4 --vllm
+fi
 
     # Step 2: Run judgments in parallel
     /home/abhishek.maiti/venvs/vicuna/bin/python gen_judgment.py --model-list "$model1_id" "$model2_id" --mode pairwise-all --bench-name $bench_name --judge-model gpt-5-chat-latest & 
