@@ -45,4 +45,13 @@ fastchat/llm_judge/submit_slurm.sh
 
 fastchat/llm_judge/data/vicuna_x_logic/
 
+<<<<<<< HEAD
 *env*
+=======
+# Shell scripts
+*.sh
+
+# JSONL files
+*.jsonl
+.env*
+>>>>>>> fb53646 (add submmit slurm)
