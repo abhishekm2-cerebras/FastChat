@@ -16,6 +16,7 @@ from tqdm import tqdm
 from fastchat.llm_judge.common import load_questions, temperature_config
 from fastchat.model import load_model, get_conversation_template
 from fastchat.utils import str_to_torch_dtype
+from vllm import LLM, SamplingParams
 
 
 def run_eval(
@@ -32,6 +33,7 @@ def run_eval(
     max_gpu_memory,
     dtype,
     revision,
+    vllm,
 ):
     questions = load_questions(question_file, question_begin, question_end)
     # random shuffle the questions to balance the loading
@@ -63,6 +65,7 @@ def run_eval(
                 max_gpu_memory,
                 dtype=dtype,
                 revision=revision,
+                vllm=vllm,
             )
         )
 
@@ -82,7 +85,138 @@ def get_model_answers(
     max_gpu_memory,
     dtype,
     revision,
+    vllm,
 ):
+    """
+    If vllm=True: use vLLM with identical prompting, temperature, seeds, stop logic, and output shape.
+    Else: fall back to your existing HF generation path.
+    """
+
+    def _normalize_stop(conv):
+        # Return (stop_strs_list or None, stop_token_ids or None)
+        stop_strs = None
+        if conv.stop_str:
+            stop_strs = conv.stop_str if isinstance(conv.stop_str, list) else [conv.stop_str]
+        stop_token_ids = conv.stop_token_ids if getattr(conv, "stop_token_ids", None) else None
+        return stop_strs, stop_token_ids
+
+    # ------------------------
+    # vLLM branch
+    # ------------------------
+    if vllm:
+        # Lazy import so HF-only runs don't require vllm
+        from vllm import LLM, SamplingParams
+
+        # Map dtype to vLLM expected strings
+        vllm_dtype = None
+        if dtype is not None:
+            s = str(dtype).lower()
+            if "bfloat16" in s or "bf16" in s:
+                vllm_dtype = "bfloat16"
+            elif "float16" in s or "fp16" in s or "half" in s:
+                vllm_dtype = "float16"
+            elif "float32" in s or "fp32" in s:
+                vllm_dtype = "float32"
+            else:
+                vllm_dtype = "auto"
+        else:
+            vllm_dtype = "auto"
+
+        llm = LLM(
+            model=model_path if model_path is not None else model_id,
+            revision=revision,
+            tensor_parallel_size=max(1, int(num_gpus_per_model or 1)),
+            dtype=vllm_dtype,
+            trust_remote_code=True,
+        )
+        tokenizer = llm.get_tokenizer()
+
+        for question in tqdm(questions):
+            if question["category"] in temperature_config:
+                temperature = temperature_config[question["category"]]
+            else:
+                temperature = 0.7
+
+            choices = []
+            for i in range(num_choices):
+                # Keep per-choice determinism & diversity identical to HF
+                seed = i
+                conv = get_conversation_template(model_id)
+                turns = []
+
+                for j in range(len(question["turns"])):
+                    qs = question["turns"][j]
+                    conv.append_message(conv.roles[0], qs)
+                    conv.append_message(conv.roles[1], None)
+                    prompt = conv.get_prompt()
+
+                    # Match HF's do_sample behavior
+                    do_sample = temperature >= 1e-4
+
+                    stop_strs, stop_token_ids = _normalize_stop(conv)
+                    sampling_params = SamplingParams(
+                        temperature=temperature,
+                        max_tokens=max_new_token,
+                        n=1,
+                        seed=seed,
+                        # If do_sample=False, vLLM will effectively run greedy
+                        # (temperature is ignored). That's fine and matches HF.
+                        stop=stop_strs,
+                        stop_token_ids=stop_token_ids if stop_token_ids else None,
+                        detokenize=True,
+                    )
+
+                    try:
+                        # vLLM generates per prompt; we provide 1 prompt at a time
+                        out = llm.generate([prompt], sampling_params, use_tqdm=False)
+                        # vLLM returns a list[RequestOutput]; each has .outputs list
+                        output = out[0].outputs[0].text if out and out[0].outputs else ""
+
+                        # Post-process to mirror HF cleanup (in case stop wasn’t fully applied)
+                        if isinstance(conv.stop_str, list):
+                            stop_str_indices = sorted(
+                                [output.find(s) for s in conv.stop_str if output.find(s) > 0]
+                            )
+                            if len(stop_str_indices) > 0:
+                                output = output[: stop_str_indices[0]]
+                        elif conv.stop_str and output.find(conv.stop_str) > 0:
+                            output = output[: output.find(conv.stop_str)]
+
+                        # Remove special tokens similarly to HF path
+                        for special_token in tokenizer.special_tokens_map.values():
+                            if isinstance(special_token, list):
+                                for special_tok in special_token:
+                                    output = output.replace(special_tok, "")
+                            else:
+                                output = output.replace(special_token, "")
+                        output = output.strip()
+
+                        if conv.name == "xgen" and output.startswith("Assistant:"):
+                            output = output.replace("Assistant:", "", 1).strip()
+
+                    except RuntimeError:
+                        print("ERROR question ID: ", question["question_id"])
+                        output = "ERROR"
+
+                    conv.update_last_message(output)
+                    turns.append(output)
+
+                choices.append({"index": i, "turns": turns})
+
+            # Dump answers
+            os.makedirs(os.path.dirname(answer_file), exist_ok=True)
+            with open(os.path.expanduser(answer_file), "a") as fout:
+                ans_json = {
+                    "question_id": question["question_id"],
+                    "answer_id": shortuuid.uuid(),
+                    "model_id": model_id,
+                    "choices": choices,
+                    "tstamp": time.time(),
+                }
+                fout.write(json.dumps(ans_json, ensure_ascii=False) + "\n")
+
+        return  # end vLLM branch
+
     model, tokenizer = load_model(
         model_path,
         revision=revision,
@@ -95,6 +229,7 @@ def get_model_answers(
         debug=False,
     )
 
+    model.bfloat16() # To avoid NaN errors
     for question in tqdm(questions):
         if question["category"] in temperature_config:
             temperature = temperature_config[question["category"]]
@@ -187,7 +322,7 @@ def get_model_answers(
                 "choices": choices,
                 "tstamp": time.time(),
             }
-            fout.write(json.dumps(ans_json) + "\n")
+            fout.write(json.dumps(ans_json, ensure_ascii=False) + "\n")
 
 
 def reorg_answer_file(answer_file):
@@ -270,6 +405,13 @@ if __name__ == "__main__":
         help="The model revision to load.",
     )
 
+    parser.add_argument(
+        "--vllm",
+        action="store_true",
+        help="Use VLLM to generate answers.",
+        default=False,
+    )
+
     args = parser.parse_args()
 
     if args.num_gpus_total // args.num_gpus_per_model > 1:
@@ -299,6 +441,7 @@ if __name__ == "__main__":
         max_gpu_memory=args.max_gpu_memory,
         dtype=str_to_torch_dtype(args.dtype),
         revision=args.revision,
+        vllm=args.vllm,
     )
 
     reorg_answer_file(answer_file)

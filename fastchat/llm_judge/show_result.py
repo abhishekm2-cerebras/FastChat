@@ -7,8 +7,13 @@ import pandas as pd
 
 
 def display_result_single(args):
+    sorted_model_list = None
+    if args.model_list is not None:
+        sorted_model_list = sorted(args.model_list)
+
     if args.input_file is None:
         input_file = (
+            # f"data/{args.bench_name}/model_judgment/{args.judge_model}_single.jsonl"
             f"data/{args.bench_name}/model_judgment/{args.judge_model}_single.jsonl"
         )
     else:
@@ -37,9 +42,14 @@ def display_result_single(args):
 
 
 def display_result_pairwise(args):
+    sorted_model_list = None
+    if args.model_list is not None:
+        sorted_model_list = sorted(args.model_list)
+
     if args.input_file is None:
         input_file = (
-            f"data/{args.bench_name}/model_judgment/{args.judge_model}_pair.jsonl"
+            # f"data/{args.bench_name}/model_judgment/{args.judge_model}_pair.jsonl"
+            f"data/{args.bench_name}/model_judgment/{args.judge_model}_{'_vs_'.join(sorted_model_list)}_pair.jsonl"
         )
     else:
         input_file = args.input_file

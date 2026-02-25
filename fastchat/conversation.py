@@ -39,6 +39,7 @@ class SeparatorStyle(IntEnum):
     GEMMA = auto()
     CLLM = auto()
     DEFAULT = auto()
+    HALA = auto()
 
 
 IMAGE_PLACEHOLDER_STR = "$$<image>$$"
@@ -323,6 +324,14 @@ class Conversation:
                     ret += role + ": " + message + "\n"
                 else:
                     ret += role + ":"
+            return ret
+        elif self.sep_style == SeparatorStyle.HALA:
+            ret = "<bos>"
+            for role, message in self.messages:
+                if message:
+                    ret += "<start_of_turn>" + role + "\n" + message + "<end_of_turn>" + self.sep
+                else:
+                    ret += "<start_of_turn>" + role + "\n"
             return ret
         else:
             raise ValueError(f"Invalid style: {self.sep_style}")
@@ -2295,6 +2304,44 @@ register_conv_template(
         roles=("user", "assistant"),
         sep_style=SeparatorStyle.DEFAULT,
         sep=None,
+    )
+)
+
+# WhatWhyHow template
+register_conv_template(
+    Conversation(
+        name="whatwhyhow_ar",
+        system_message="تصرف كمساعد خبير واسع المعرفة، ودود وداعم، يركز على تمكين المستخدمين من خلال تقديم معلومات شاملة وعملية وسهلة الفهم. نظّم ردودك بوضوح باستخدام ماركداون، واشرح المفاهيم بعمق باستخدام إطار \"ماذا، لماذا، كيف/مثال\"، وأدرِج السياق ذا الصلة. اختتم بتلخيص النقاط الرئيسية، وبادِر بتقديم مساعدة إضافية محددة وذات صلة لدعم أهداف المستخدم.",
+        system_template="<|start_header_id|>system<|end_header_id|>\n\n{system_message}<|eot_id|>",
+        roles=("user", "ai"),
+        sep_style=SeparatorStyle.LLAMA3,
+        sep="",
+        stop_str="<|eot_id|>",
+        stop_token_ids=[150024],
+    )
+)
+
+#Hala Conversation Template 
+register_conv_template(
+    Conversation(
+        name="hala",
+        system_message="",
+        roles=("user", "model"),
+        sep_style=SeparatorStyle.HALA,
+        stop_token_ids=[1],
+        sep='\n',
+    )
+)
+
+register_conv_template(
+    Conversation(
+        name="jais-2",
+        system_template="<|start_header_id|>system<|end_header_id|>\n\n{system_message}<|eot_id|>",
+        roles=("user", "ai"),
+        sep_style=SeparatorStyle.LLAMA3,
+        sep="",
+        stop_str="<|eot_id|>",
+        stop_token_ids=[150024],
     )
 )
 

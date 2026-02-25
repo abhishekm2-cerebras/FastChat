@@ -34,3 +34,24 @@ build
 serve_images
 val2014
 vqa_examples
+
+# Ignore answers 
+fastchat/llm_judge/data/vicuna_ar_extended/answer_excel
+fastchat/llm_judge/data/vicuna_ar_extended/model_answer
+fastchat/llm_judge/data/vicuna_ar_extended/model_judgment 
+fastchat/llm_judge/submit_slurm.sh
+
+*.jsonl
+
+fastchat/llm_judge/data/vicuna_x_logic/
+
+<<<<<<< HEAD
+*env*
+=======
+# Shell scripts
+*.sh
+
+# JSONL files
+*.jsonl
+.env*
+>>>>>>> fb53646 (add submmit slurm)
